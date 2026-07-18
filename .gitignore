@@ -1,0 +1,18 @@
+# 1. Ignore absolutely everything by default
+*
+**/__pycache__/
+.venv/
+.agents/
+
+# 2. Allow the gitignore file itself
+!.gitignore
+
+# 3. Allow your core project files
+!main.py
+!jujutsu_engine.py
+!HandTrackingModule.py
+
+# 4. Allow the techniques folder structure, but ignore the videos inside it
+!techniques/
+techniques/*
+!.gitkeep
