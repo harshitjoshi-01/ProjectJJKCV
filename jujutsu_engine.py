@@ -24,10 +24,11 @@ class jujutsu_engine:
             self.stream.set(cv2.CAP_PROP_POS_FRAMES, total - loop_frame)
             #self.intro_finished = True
             ret, frame = self.stream.read()
-        # if not ret or frame is None:
-        #         return np.zeros((720, 1280, 3), dtype=np.uint8)
                
         return cv2.resize(frame, (1280, 720))
+    
+    def reset_video(self):
+        self.stream.set(cv2.CAP_PROP_POS_FRAMES, 0)
     
     def release(self):
         self.stream.release()
@@ -36,7 +37,7 @@ class InfiniteVoid(jujutsu_engine):
         def __init__(self, video_path):
             super().__init__("void", video_path)
             self.loop_sec = 0.15
-            #self.intro_finished = False
+            self.exit_delay = 5
         def check_gesture(self, lmlist):
                 wrist = lmlist[0]
                 m_knuckle = lmlist[9] 
@@ -61,8 +62,6 @@ class InfiniteVoid(jujutsu_engine):
                 is_ring_folded = dist_ring < (hand_scale * 1.20)
                 is_pinky_folded = dist_pinky < (hand_scale * 1.20)
                 
-                # The fingers only need to be near each other; they do not need
-                # to be tightly squeezed together.
                 is_crossed = tip_cross_dist < (hand_scale * 0.90)
 
                 return (is_index_extended and is_middle_extended and 
@@ -78,47 +77,46 @@ class JujutsuEngine:
         
         self.alpha = 0.0
         self.transition_rate = 0.06
-        self.domain_active = False
         self.transitioning = None
         self.exit_time = None
-        self.exit_delay = 5          
+        #self.exit_delay = 5          
         self.should_exit = False
+        self.techniques = []
+        self.active_technique = None
 
-    def register_technique(self, technique_instance):
-        self.technique = technique_instance
+    def register_technique(self, technique):
+        self.techniques.append(technique)
 
     def update_states(self, lmlist):
         gesture_detected = False 
 
-        if len(lmlist) != 0 and self.technique:
-            gesture_detected =  self.technique.check_gesture(lmlist)
+        if len(lmlist) != 0:
+            for technique in self.techniques:
+                if technique.check_gesture(lmlist):
+                    gesture_detected = True
+                    if self.active_technique != technique:
+                        self.active_technique = technique
+                        self.active_technique.reset_video()
+                    break
+
         if gesture_detected:
             self.should_exit = False
             self.exit_time = None
             self.alpha = min(1.0, self.alpha + self.transition_rate)
-            if self.alpha >= 1.0:
-                self.domain_active = True
         elif self.alpha > 0:
             if self.exit_time is None:
                 self.exit_time = time.time()
 
-        # After 3 seconds request shutdown
-            if time.time() - self.exit_time >= self.exit_delay:
+            if (self.active_technique is not None and time.time() - self.exit_time >= self.active_technique.exit_delay):
                 self.should_exit = True
 
     def build_canvas(self, img):
         frame = self.background.copy()
+   
 
-        # cap_resized = cv2.resize(img, (280, 265))
-        # height_cap, width_cap = cap_resized.shape[:2]
-        # y = self.height_bg - height_cap    
-
-        if self.alpha > 0.0 and self.technique:
-            domain_frame = self.technique.get_frame()
+        if self.alpha > 0.0 and self.active_technique:
+            domain_frame = self.active_technique.get_frame()
             frame = cv2.addWeighted(self.background, 1.0 - self.alpha, domain_frame, self.alpha, 0)
-            #blended_background = cv2.addWeighted(self.background, 1.0 - self.alpha, domain_frame, self.alpha, 0)
-            # frame[0:y, 0:self.width_bg] = blended_background[0:y, 0:self.width_bg]
-            # frame[y:self.height_bg, width_cap:self.width_bg] = blended_background[y:self.height_bg, width_cap:self.width_bg]
         cap_resized = cv2.resize(img, (280, 265))
         height_cap, width_cap = cap_resized.shape[:2]
         y = self.height_bg - height_cap     
@@ -126,7 +124,6 @@ class JujutsuEngine:
 
         return frame  
     def start(self):
-        #detector = htm.HandDetector()
         while True:
             success, img = self.cap.read()
             if not success:
@@ -154,6 +151,6 @@ class JujutsuEngine:
 
     def cleanup(self):
         self.cap.release()
-        if self.technique:
-            self.technique.release()
+        for technique in  self.techniques:
+            technique.release()
         cv2.destroyAllWindows()           
