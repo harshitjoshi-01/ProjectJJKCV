@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 import math
 import HandTrackingModule as htm
 
@@ -17,10 +18,14 @@ class jujutsu_engine:
         #Safely reads and loops the internal video stream asset.
         ret , frame  = self.stream.read()
         if not ret:
-            self.stream.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            total = int(self.stream.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = int(self.stream.get(cv2.CAP_PROP_FPS))
+            loop_frame = int(self.loop_sec * fps)
+            self.stream.set(cv2.CAP_PROP_POS_FRAMES, total - loop_frame)
+            #self.intro_finished = True
             ret, frame = self.stream.read()
-        if not ret or frame is None:
-                return np.zeros((720, 1280, 3), dtype=np.uint8)
+        # if not ret or frame is None:
+        #         return np.zeros((720, 1280, 3), dtype=np.uint8)
                
         return cv2.resize(frame, (1280, 720))
     
@@ -30,6 +35,8 @@ class jujutsu_engine:
 class InfiniteVoid(jujutsu_engine):
         def __init__(self, video_path):
             super().__init__("void", video_path)
+            self.loop_sec = 0.15
+            #self.intro_finished = False
         def check_gesture(self, lmlist):
                 wrist = lmlist[0]
                 m_knuckle = lmlist[9] 
@@ -73,7 +80,9 @@ class JujutsuEngine:
         self.transition_rate = 0.06
         self.domain_active = False
         self.transitioning = None
-        
+        self.exit_time = None
+        self.exit_delay = 5          
+        self.should_exit = False
 
     def register_technique(self, technique_instance):
         self.technique = technique_instance
@@ -82,16 +91,20 @@ class JujutsuEngine:
         gesture_detected = False 
 
         if len(lmlist) != 0 and self.technique:
-            if self.technique.check_gesture(lmlist):
-                gesture_detected = True
+            gesture_detected =  self.technique.check_gesture(lmlist)
         if gesture_detected:
+            self.should_exit = False
+            self.exit_time = None
             self.alpha = min(1.0, self.alpha + self.transition_rate)
             if self.alpha >= 1.0:
-                    self.domain_active = True
-        else:
-            self.alpha = max(0.0, self.alpha - self.transition_rate)
-            if self.alpha <= 0.0:
-                self.domain_active = False 
+                self.domain_active = True
+        elif self.alpha > 0:
+            if self.exit_time is None:
+                self.exit_time = time.time()
+
+        # After 3 seconds request shutdown
+            if time.time() - self.exit_time >= self.exit_delay:
+                self.should_exit = True
 
     def build_canvas(self, img):
         frame = self.background.copy()
@@ -129,6 +142,8 @@ class JujutsuEngine:
                 print(f"✅ Camera Status: Tracking active ({len(lmlist)} points detected)", end="\r")
 
             self.update_states(lmlist)
+            if self.should_exit:
+                break
             output_canvas = self.build_canvas(img)
             
             cv2.imshow("video", output_canvas)
