@@ -77,12 +77,14 @@ class JujutsuEngine:
         
         self.alpha = 0.0
         self.transition_rate = 0.06
-        self.transitioning = None
-        self.exit_time = None
-        #self.exit_delay = 5          
+        self.exit_time = None          
         self.should_exit = False
         self.techniques = []
         self.active_technique = None
+        self.previous_technique = None
+        self.is_switching = False
+        self.switch_alpha = 0.0
+        self.switch_rate = 0.08
 
     def register_technique(self, technique):
         self.techniques.append(technique)
@@ -95,8 +97,14 @@ class JujutsuEngine:
                 if technique.check_gesture(lmlist):
                     gesture_detected = True
                     if self.active_technique != technique:
+                        self.previous_technique = self.active_technique
                         self.active_technique = technique
                         self.active_technique.reset_video()
+                        self.alpha = 0.0
+                        # if self.previous_technique is None:
+                        #     self.alpha = 0.0
+                        self.is_switching = True
+                        self.switch_alpha = 0.0
                     break
 
         if gesture_detected:
@@ -109,14 +117,35 @@ class JujutsuEngine:
 
             if (self.active_technique is not None and time.time() - self.exit_time >= self.active_technique.exit_delay):
                 self.should_exit = True
+        if self.is_switching:
+
+            self.switch_alpha += self.switch_rate
+
+            if self.switch_alpha >= 1.0:
+                self.switch_alpha = 1.0
+                self.is_switching = False
+                if self.previous_technique:
+                    self.previous_technique.reset_video()
+                self.previous_technique = None
 
     def build_canvas(self, img):
         frame = self.background.copy()
    
 
         if self.alpha > 0.0 and self.active_technique:
-            domain_frame = self.active_technique.get_frame()
-            frame = cv2.addWeighted(self.background, 1.0 - self.alpha, domain_frame, self.alpha, 0)
+
+            if self.is_switching and self.previous_technique:
+
+                old_frame = self.previous_technique.get_frame()
+                new_frame = self.active_technique.get_frame()
+
+                domain_frame = cv2.addWeighted(old_frame,1.0 - self.switch_alpha,new_frame,self.switch_alpha,0)
+
+            else:
+                domain_frame = self.active_technique.get_frame()
+
+            frame = cv2.addWeighted(self.background,1.0 - self.alpha,domain_frame,self.alpha,0)
+
         cap_resized = cv2.resize(img, (280, 265))
         height_cap, width_cap = cap_resized.shape[:2]
         y = self.height_bg - height_cap     
