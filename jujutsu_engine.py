@@ -10,9 +10,43 @@ class jujutsu_engine:
         self.video_path = video_path
         self.stream = cv2.VideoCapture(video_path)   
 
+    WRIST = 0
+
+    THUMB_TIP = 4
+
+    INDEX_MCP = 5
+    INDEX_PIP = 6
+    INDEX_DIP = 7
+    INDEX_TIP = 8
+
+    MIDDLE_MCP = 9
+    MIDDLE_PIP = 10
+    MIDDLE_DIP = 11
+    MIDDLE_TIP = 12
+
+    RING_MCP = 13
+    RING_PIP = 14
+    RING_DIP = 15
+    RING_TIP = 16
+
+    PINKY_MCP = 17
+    PINKY_PIP = 18
+    PINKY_DIP = 19
+    PINKY_TIP = 20
+
     def check_gesture(self , lmlist):
         #Must be overridden by subclasses to define gesture math.
-        raise NotImplementedError("Each technique must implement its own gesture criteria.")     
+        raise NotImplementedError("Each technique must implement its own gesture criteria.")  
+
+       
+    def landmark_distance(self , lmlist , point1 , point2):
+         return math.hypot(lmlist[point1][1] - lmlist[point2][1],lmlist[point1][2] - lmlist[point2][2])
+
+
+    def get_hand_scale(self, lmlist):
+        scale = self.landmark_distance(lmlist,self.WRIST,self.MIDDLE_MCP)
+        return max(scale, 1)
+
     
     def get_frame(self):
         #Safely reads and loops the internal video stream asset.
@@ -39,25 +73,17 @@ class InfiniteVoid(jujutsu_engine):
             self.loop_sec = 0.15
             self.exit_delay = 5
         def check_gesture(self, lmlist):
-                wrist = lmlist[0]
-                m_knuckle = lmlist[9] 
-        
-                wrist_x, wrist_y = wrist[1], wrist[2]
-                knuckle_x, knuckle_y = m_knuckle[1], m_knuckle[2]
-        
-                hand_scale = math.hypot(knuckle_x - wrist_x, knuckle_y - wrist_y)
-                if hand_scale == 0:
-                    hand_scale = 1
+                hand_scale = self.get_hand_scale(lmlist)
                 
-                dist_index = math.hypot(lmlist[8][1] - wrist_x, lmlist[8][2] - wrist_y)
-                dist_middle = math.hypot(lmlist[12][1] - wrist_x, lmlist[12][2] - wrist_y)
-                dist_ring = math.hypot(lmlist[16][1] - wrist_x, lmlist[16][2] - wrist_y)
-                dist_pinky = math.hypot(lmlist[20][1] - wrist_x, lmlist[20][2] - wrist_y)
+                dist_index =self.landmark_distance(lmlist,self.WRIST,self.INDEX_TIP)
+                dist_middle = self.landmark_distance(lmlist,self.WRIST,self.MIDDLE_TIP)
+                dist_ring = self.landmark_distance(lmlist,self.WRIST,self.RING_TIP)
+                dist_pinky = self.landmark_distance(lmlist,self.WRIST,self.PINKY_TIP)
 
-                tip_cross_dist = math.hypot(lmlist[8][1] - lmlist[12][1], lmlist[8][2] - lmlist[12][2])
+                tip_cross_dist =self.landmark_distance(lmlist,self.INDEX_TIP,self.MIDDLE_TIP)
 
-                is_index_extended = dist_index > (hand_scale * 1.2)
-                is_middle_extended = dist_middle > (hand_scale * 1.2)
+                is_index_extended = dist_index > (hand_scale * 1.20)
+                is_middle_extended = dist_middle > (hand_scale * 1.20)
                 
                 is_ring_folded = dist_ring < (hand_scale * 1.20)
                 is_pinky_folded = dist_pinky < (hand_scale * 1.20)
@@ -74,29 +100,27 @@ class ReversalRed(jujutsu_engine):
          self.exit_delay = 4
 
     def check_gesture(self , lmlist):
-            wrist = lmlist[0]
-            i_knuckle = lmlist[5] 
-        
-            wrist_x, wrist_y = wrist[1], wrist[2]
-            knuckle_x, knuckle_y = i_knuckle[1], i_knuckle[2]
-        
-            hand_scale = math.hypot(knuckle_x - wrist_x, knuckle_y - wrist_y)
-            if hand_scale == 0:
-                hand_scale = 1
+            hand_scale = self.get_hand_scale(lmlist)
             #dist_thumb = math.hypot(lmlist[4][1] - wrist_x, lmlist[4][2] - wrist_y)    
-            dist_index = math.hypot(lmlist[8][1] - wrist_x, lmlist[8][2] - wrist_y)
-            dist_middle = math.hypot(lmlist[12][1] - wrist_x, lmlist[12][2] - wrist_y)
-            dist_ring = math.hypot(lmlist[16][1] - wrist_x, lmlist[16][2] - wrist_y)
-            dist_pinky = math.hypot(lmlist[20][1] - wrist_x, lmlist[20][2] - wrist_y)
+            dist_index = self.landmark_distance(lmlist,self.WRIST,self.INDEX_TIP)
+            dist_middle = self.landmark_distance(lmlist,self.WRIST,self.MIDDLE_TIP)
+            dist_ring = self.landmark_distance(lmlist,self.WRIST,self.RING_TIP)
+            dist_pinky = self.landmark_distance(lmlist,self.WRIST,self.PINKY_TIP)
 
             #is_thumb_folded = dist_thumb < (hand_scale * 1.00)
-            is_index_extended = (lmlist[8][2] < lmlist[7][2] < lmlist[6][2] < lmlist[5][2]) and (dist_index > (hand_scale * 1.30))
+            is_index_extended = (lmlist[self.INDEX_TIP][2] < lmlist[self.INDEX_DIP][2] < lmlist[self.INDEX_PIP][2] < lmlist[self.INDEX_MCP][2]) and (dist_index > (hand_scale * 1.30))
             is_middle_folded = dist_middle < (hand_scale * 1.00)         
             is_ring_folded = dist_ring < (hand_scale * 1.00)
             is_pinky_folded = dist_pinky < (hand_scale * 1.00) 
 
             return ( is_index_extended and is_middle_folded and 
                      is_ring_folded and is_pinky_folded)
+
+class LapseBlue(jujutsu_engine):
+        def __init__(self , video_path):
+            super().__init__("blue",video_path)
+            self.loop_sec = 0.30
+            self.exit_delay = 4
                     
                 
 class JujutsuEngine:
