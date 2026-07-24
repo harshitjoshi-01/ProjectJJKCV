@@ -66,6 +66,38 @@ class InfiniteVoid(jujutsu_engine):
 
                 return (is_index_extended and is_middle_extended and 
                      is_ring_folded and is_pinky_folded and is_crossed)
+
+class ReversalRed(jujutsu_engine):
+    def __init__(self , video_path):
+         super().__init__("red",video_path)
+         self.loop_sec = 0.30
+         self.exit_delay = 4
+
+    def check_gesture(self , lmlist):
+            wrist = lmlist[0]
+            i_knuckle = lmlist[5] 
+        
+            wrist_x, wrist_y = wrist[1], wrist[2]
+            knuckle_x, knuckle_y = i_knuckle[1], i_knuckle[2]
+        
+            hand_scale = math.hypot(knuckle_x - wrist_x, knuckle_y - wrist_y)
+            if hand_scale == 0:
+                hand_scale = 1
+            #dist_thumb = math.hypot(lmlist[4][1] - wrist_x, lmlist[4][2] - wrist_y)    
+            dist_index = math.hypot(lmlist[8][1] - wrist_x, lmlist[8][2] - wrist_y)
+            dist_middle = math.hypot(lmlist[12][1] - wrist_x, lmlist[12][2] - wrist_y)
+            dist_ring = math.hypot(lmlist[16][1] - wrist_x, lmlist[16][2] - wrist_y)
+            dist_pinky = math.hypot(lmlist[20][1] - wrist_x, lmlist[20][2] - wrist_y)
+
+            #is_thumb_folded = dist_thumb < (hand_scale * 1.00)
+            is_index_extended = (lmlist[8][2] < lmlist[7][2] < lmlist[6][2] < lmlist[5][2]) and (dist_index > (hand_scale * 1.30))
+            is_middle_folded = dist_middle < (hand_scale * 1.00)         
+            is_ring_folded = dist_ring < (hand_scale * 1.00)
+            is_pinky_folded = dist_pinky < (hand_scale * 1.00) 
+
+            return ( is_index_extended and is_middle_folded and 
+                     is_ring_folded and is_pinky_folded)
+                    
                 
 class JujutsuEngine:
     def __init__(self, camera_index=0):
@@ -100,9 +132,8 @@ class JujutsuEngine:
                         self.previous_technique = self.active_technique
                         self.active_technique = technique
                         self.active_technique.reset_video()
-                        self.alpha = 0.0
-                        # if self.previous_technique is None:
-                        #     self.alpha = 0.0
+                        if self.previous_technique is None:
+                            self.alpha = 0.0
                         self.is_switching = True
                         self.switch_alpha = 0.0
                     break
