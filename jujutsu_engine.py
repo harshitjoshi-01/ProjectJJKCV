@@ -115,14 +115,52 @@ class ReversalRed(jujutsu_engine):
 
             return ( is_index_extended and is_middle_folded and 
                      is_ring_folded and is_pinky_folded)
-
+  
 class LapseBlue(jujutsu_engine):
         def __init__(self , video_path):
             super().__init__("blue",video_path)
             self.loop_sec = 0.30
             self.exit_delay = 4
-                    
-                
+        def check_gesture(self , lmlist):
+            hand_scale = self.get_hand_scale(lmlist)   
+            dist_thumb = self.landmark_distance(lmlist , self.WRIST , self.THUMB_TIP)
+            dist_index = self.landmark_distance(lmlist,self.WRIST,self.INDEX_TIP)
+            dist_middle = self.landmark_distance(lmlist,self.WRIST,self.MIDDLE_TIP)
+            dist_ring = self.landmark_distance(lmlist,self.WRIST,self.RING_TIP)
+            dist_pinky = self.landmark_distance(lmlist,self.WRIST,self.PINKY_TIP)
+
+            is_thumb_extended = dist_thumb > hand_scale * 1.0
+            is_index_extended = ( lmlist[self.INDEX_TIP][2] < lmlist[self.INDEX_DIP][2] < lmlist[self.INDEX_PIP][2] < lmlist[self.INDEX_MCP][2]) and (dist_index > hand_scale * 1.30)
+            is_middle_extended = ( lmlist[self.MIDDLE_TIP][2] < lmlist[self.MIDDLE_DIP][2] < lmlist[self.MIDDLE_PIP][2] < lmlist[self.MIDDLE_MCP][2]) and (dist_middle > hand_scale * 1.30)        
+            is_ring_extended = ( lmlist[self.RING_TIP][2] < lmlist[self.RING_DIP][2] < lmlist[self.RING_PIP][2] < lmlist[self.RING_MCP][2]) and (dist_ring > hand_scale * 1.30)
+            is_pinky_extended = ( lmlist[self.PINKY_TIP][2] < lmlist[self.PINKY_DIP][2] < lmlist[self.PINKY_PIP][2] < lmlist[self.PINKY_MCP][2]) and (dist_pinky > hand_scale * 1.30)
+
+
+            #**CHECKING SPREAD**
+            thumb_index = self.landmark_distance(lmlist , self.THUMB_TIP , self.INDEX_TIP)
+            index_middle = self.landmark_distance(lmlist , self.INDEX_TIP , self.MIDDLE_TIP)
+            middle_ring = self.landmark_distance(lmlist , self.MIDDLE_TIP , self.RING_TIP)
+            ring_pinky = self.landmark_distance(lmlist , self.RING_TIP , self.PINKY_TIP)
+
+
+            # print(
+            #     f"T-I : {thumb_index / hand_scale:.2f}",
+            #     f"I-M : {index_middle / hand_scale:.2f}",
+            #     f"M-R : {middle_ring / hand_scale:.2f}",
+            #     f"R-P : {ring_pinky / hand_scale:.2f}"
+            # )
+            are_spread = (
+            thumb_index > hand_scale * 1.0 and
+            index_middle > hand_scale * 0.45 and
+            middle_ring > hand_scale * 0.35 and
+            ring_pinky > hand_scale * 0.50
+        )
+
+            return ( is_thumb_extended and is_index_extended 
+                    and is_middle_extended and is_ring_extended and is_pinky_extended and are_spread
+            )
+        
+               
 class JujutsuEngine:
     def __init__(self, camera_index=0):
         self.cap = cv2.VideoCapture(camera_index)
