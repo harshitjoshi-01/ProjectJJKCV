@@ -160,7 +160,6 @@ class LapseBlue(jujutsu_engine):
                     and is_middle_extended and is_ring_extended and is_pinky_extended and are_spread
             )
         
-               
 class JujutsuEngine:
     def __init__(self, camera_index=0):
         self.cap = cv2.VideoCapture(camera_index)
@@ -191,13 +190,18 @@ class JujutsuEngine:
                 if technique.check_gesture(lmlist):
                     gesture_detected = True
                     if self.active_technique != technique:
-                        self.previous_technique = self.active_technique
+                        if self.active_technique is not None:
+                            self.active_technique.reset_video()
+
                         self.active_technique = technique
-                        self.active_technique.reset_video()
-                        if self.previous_technique is None:
-                            self.alpha = 0.0
-                        self.is_switching = True
+                        if hasattr(self.active_technique, "reset"):
+                            self.active_technique.reset()
+                        else:
+                            self.active_technique.reset_video()
+                        self.previous_technique = None
+                        self.is_switching = False
                         self.switch_alpha = 0.0
+                        self.alpha = 0.0
                     break
 
         if gesture_detected:
@@ -210,32 +214,13 @@ class JujutsuEngine:
 
             if (self.active_technique is not None and time.time() - self.exit_time >= self.active_technique.exit_delay):
                 self.should_exit = True
-        if self.is_switching:
-
-            self.switch_alpha += self.switch_rate
-
-            if self.switch_alpha >= 1.0:
-                self.switch_alpha = 1.0
-                self.is_switching = False
-                if self.previous_technique:
-                    self.previous_technique.reset_video()
-                self.previous_technique = None
-
     def build_canvas(self, img):
         frame = self.background.copy()
    
 
         if self.alpha > 0.0 and self.active_technique:
 
-            if self.is_switching and self.previous_technique:
-
-                old_frame = self.previous_technique.get_frame()
-                new_frame = self.active_technique.get_frame()
-
-                domain_frame = cv2.addWeighted(old_frame,1.0 - self.switch_alpha,new_frame,self.switch_alpha,0)
-
-            else:
-                domain_frame = self.active_technique.get_frame()
+            domain_frame = self.active_technique.get_frame()
 
             frame = cv2.addWeighted(self.background,1.0 - self.alpha,domain_frame,self.alpha,0)
 
@@ -275,4 +260,4 @@ class JujutsuEngine:
         self.cap.release()
         for technique in  self.techniques:
             technique.release()
-        cv2.destroyAllWindows()           
+        cv2.destroyAllWindows()

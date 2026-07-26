@@ -1,4 +1,4 @@
-from jujutsu_engine import JujutsuEngine, InfiniteVoid , ReversalRed , LapseBlue
+from jujutsu_engine import JujutsuEngine, InfiniteVoid, ReversalRed, LapseBlue
 
 def main():
     engine = JujutsuEngine(camera_index=0)
@@ -9,7 +9,7 @@ def main():
     engine.register_technique(void_expansion)
     engine.register_technique(reversal_red)
     engine.register_technique(lapse_blue)
-    
+
     engine.start()
 
 if __name__ == "__main__":
